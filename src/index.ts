@@ -217,7 +217,8 @@ async function createPdf(html: string, options: MdPdfOptions): Promise<string> {
     });
 
     // have to bypass by arguments
-    const targetTitle = parsePath(options.source).name
+    // custom title support
+    const targetTitle = options.pdf?.title ? options.pdf.title : parsePath(options.source).name
     await page.evaluate((targetTitle) => {
       // overwrite title to fix https://github.com/elliotblackburn/mdpdf/issues/211
       document.title = targetTitle
