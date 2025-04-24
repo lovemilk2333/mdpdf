@@ -1,8 +1,6 @@
 import {
   copyFileSync,
-  unlinkSync,
-  existsSync,
-  mkdirSync
+  unlinkSync
 } from 'fs';
 import {
   readFile,
@@ -21,17 +19,9 @@ import { allowUnsafeNewFunction } from 'loophole';
 import { getStyles, getStyleBlock, qualifyImgSources } from './utils.js';
 import { getOptions } from './puppeteer-helper.js';
 import { MdPdfOptions } from './types.js';
-import { tmpdir } from 'os'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// the directory for temp HTML
-const tempDir = join(tmpdir(), '/mdpdf-cache')
-if (!existsSync(tempDir)) {
-  // if it doesn't exist, create it
-  mkdirSync(tempDir);
-}
 
 // Main layout template
 const layoutPath = join(__dirname, '/layouts/doc-body.hbs');
@@ -210,8 +200,7 @@ function prepareFooter(options: MdPdfOptions): Promise<string | undefined> {
 }
 
 async function createPdf(html: string, options: MdPdfOptions): Promise<string> {
-  // name temp HTML to source name to solve https://github.com/elliotblackburn/mdpdf/issues/211
-  const tempHtmlPath = resolve(tempDir, `${parsePath(options.source).name}.html`)
+  const tempHtmlPath = resolve(dirname(options.destination), '_temp.html');
 
   let browser: Browser | null = null; // Initialize browser to null
 
@@ -226,6 +215,13 @@ async function createPdf(html: string, options: MdPdfOptions): Promise<string> {
     await page.goto('file:' + tempHtmlPath, {
       waitUntil: options.waitUntil ?? 'networkidle0',
     });
+
+    // have to bypass by arguments
+    const targetTitle = parsePath(options.source).name
+    await page.evaluate((targetTitle) => {
+      // overwrite title to fix https://github.com/elliotblackburn/mdpdf/issues/211
+      document.title = targetTitle
+    }, targetTitle);
 
     const puppetOptions = getOptions(options);
     await page.pdf(puppetOptions);
