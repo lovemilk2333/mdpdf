@@ -1,11 +1,14 @@
 import {
-  readFile as _readFile,
-  writeFile as _writeFile,
   copyFileSync,
   unlinkSync,
+  existsSync,
+  mkdirSync
 } from 'fs';
-import { join, dirname, resolve } from 'path';
-import { promisify } from 'util';
+import {
+  readFile,
+  writeFile
+} from 'fs/promises'
+import { join, dirname, resolve, parse as parsePath } from 'path';
 import { fileURLToPath } from 'url';
 import showdown from 'showdown';
 const { setFlavor, Converter } = showdown;
@@ -18,12 +21,17 @@ import { allowUnsafeNewFunction } from 'loophole';
 import { getStyles, getStyleBlock, qualifyImgSources } from './utils.js';
 import { getOptions } from './puppeteer-helper.js';
 import { MdPdfOptions } from './types.js';
-
-const readFile = promisify(_readFile);
-const writeFile = promisify(_writeFile);
+import { tmpdir } from 'os'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// the directory for temp HTML
+const tempDir = join(tmpdir(), '/mdpdf-cache')
+if (!existsSync(tempDir)) {
+  // if it doesn't exist, create it
+  mkdirSync(tempDir);
+}
 
 // Main layout template
 const layoutPath = join(__dirname, '/layouts/doc-body.hbs');
@@ -202,7 +210,9 @@ function prepareFooter(options: MdPdfOptions): Promise<string | undefined> {
 }
 
 async function createPdf(html: string, options: MdPdfOptions): Promise<string> {
-  const tempHtmlPath = resolve(dirname(options.destination), '_temp.html');
+  // name temp HTML to source name to solve https://github.com/elliotblackburn/mdpdf/issues/211
+  const tempHtmlPath = resolve(tempDir, `${parsePath(options.source).name}.html`)
+
   let browser: Browser | null = null; // Initialize browser to null
 
   try {
